@@ -13,9 +13,48 @@ import certifi
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import make_pipeline
+import random
+import numpy as np
+import pytz
+from datetime import datetime, timedelta
+import pytz
+
+# Helper function: convert a datetime (or ISO string) to a naive datetime
+def to_naive(dt):
+    if isinstance(dt, str):
+        dt = datetime.fromisoformat(dt)
+    if dt.tzinfo is not None:
+        dt = dt.replace(tzinfo=None)
+    return dt
+
+# Calculate start_of_week (naive datetime)
+start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
+
+# Localize start_of_week to UTC (only for initial calculation, not used in comparisons)
+start_of_week_utc = pd.to_datetime(start_of_week).tz_localize('UTC')
+
+# Mock Data for Paytm Transactions
+paytm_mock_data = [
+    {"description": "Bought coffee", "total_amount": 150, "category": "Food", "date": datetime.now() - timedelta(days=1)},
+    {"description": "Shopping on Amazon", "total_amount": 2000, "category": "Shopping", "date": datetime.now() - timedelta(days=2)},
+    {"description": "Uber ride to office", "total_amount": 300, "category": "Transport", "date": datetime.now() - timedelta(days=3)},
+    {"description": "Booked movie tickets", "total_amount": 500, "category": "Entertainment", "date": datetime.now() - timedelta(days=4)},
+    {"description": "Grocery shopping at BigBasket", "total_amount": 1200, "category": "Shopping", "date": datetime.now() - timedelta(days=5)},
+]
+
+# Train a simple AI model to predict categories based on descriptions
+categories = ["Food", "Shopping", "Transport", "Entertainment"]
+descriptions = [transaction["description"] for transaction in paytm_mock_data]
+labels = [transaction["category"] for transaction in paytm_mock_data]
+
+vectorizer = CountVectorizer()
+clf = MultinomialNB()
+model = make_pipeline(vectorizer, clf)
+model.fit(descriptions, labels)
 
 # ---------- MODEL LOADING / TRAINING ----------
-# If the model files exist, load them; otherwise, train and save them.
 if (os.path.exists("vectorizer.pkl") and 
     os.path.exists("type_classifier.pkl") and 
     os.path.exists("cat_classifier.pkl") and 
@@ -33,9 +72,7 @@ if (os.path.exists("vectorizer.pkl") and
     with open("needs_cat_classifier.pkl", "rb") as f:
         needs_cat_clf = pickle.load(f)
 else:
-    # If not, train the models and then load them.
     def train_models():
-        # Full synthetic dataset with 70 examples (10 each for 7 categories)
         data = {
             "description": [
                 "Bought milk and bread", "Ordered pizza online", "Had dinner at an Italian restaurant", 
@@ -85,32 +122,24 @@ else:
         vectorizer = CountVectorizer(stop_words="english")
         X = vectorizer.fit_transform(df["description"])
         
-        # Train type classifier (for both Wants and Needs)
         y_type = df["type"]
         X_train_type, X_test_type, y_train_type, y_test_type = train_test_split(X, y_type, test_size=0.2, random_state=42)
         type_clf = RandomForestClassifier(n_estimators=100, random_state=42)
         type_clf.fit(X_train_type, y_train_type)
-        print("Type Classifier Accuracy:", type_clf.score(X_test_type, y_test_type))
         
-        # Train general (Wants) category classifier
         y_cat = df["category"]
         X_train_cat, X_test_cat, y_train_cat, y_test_cat = train_test_split(X, y_cat, test_size=0.2, random_state=42)
         cat_clf = RandomForestClassifier(n_estimators=100, random_state=42)
         cat_clf.fit(X_train_cat, y_train_cat)
-        print("Wants Category Classifier Accuracy:", cat_clf.score(X_test_cat, y_test_cat))
         
-        # Save the general models (used for Wants)
         with open("vectorizer.pkl", "wb") as f:
             pickle.dump(vectorizer, f)
         with open("type_classifier.pkl", "wb") as f:
             pickle.dump(type_clf, f)
         with open("cat_classifier.pkl", "wb") as f:
             pickle.dump(cat_clf, f)
-        
-        print("General models saved successfully.")
     
     def train_needs_model():
-        # Use the full synthetic dataset as defined above
         data = {
             "description": [
                 "Bought milk and bread", "Ordered pizza online", "Had dinner at an Italian restaurant", 
@@ -166,20 +195,15 @@ else:
         X_train, X_test, y_train, y_test = train_test_split(X, y_needs, test_size=0.2, random_state=42)
         needs_cat_clf = RandomForestClassifier(n_estimators=100, random_state=42)
         needs_cat_clf.fit(X_train, y_train)
-        print("Needs Category Classifier Accuracy:", needs_cat_clf.score(X_test, y_test))
         
         with open("vectorizer_needs.pkl", "wb") as f:
             pickle.dump(vectorizer_needs, f)
         with open("needs_cat_classifier.pkl", "wb") as f:
             pickle.dump(needs_cat_clf, f)
-        
-        print("Needs models saved successfully.")
     
-    # Run training functions
     train_models()
     train_needs_model()
     
-    # Then load the models
     with open("vectorizer.pkl", "rb") as f:
         vectorizer = pickle.load(f)
     with open("type_classifier.pkl", "rb") as f:
@@ -218,23 +242,15 @@ if "page" not in st.session_state:
 
 # ---------- Helper Functions ----------
 def safe_rerun():
-    if hasattr(st, "experimental_rerun"):
-        st.experimental_rerun()
-    else:
-        st.rerun()
+    st.rerun()
 
-
-# ======== UPDATED PASSWORD HASHING ========
 def hash_password(password: str) -> str:
-    return sha256(password.encode('utf-8')).hexdigest()  # Explicit UTF-8
+    return sha256(password.encode('utf-8')).hexdigest()
 
 def authenticate_user(username: str, password: str) -> bool:
     user = users_col.find_one({"username": username})
     return user and user["password"] == hash_password(password)
 
-# -------------------------------
-# Registration
-# -------------------------------
 def register_user(username: str, password: str) -> bool:
     if users_col.find_one({"username": username}):
         return False
@@ -249,15 +265,11 @@ def register_user(username: str, password: str) -> bool:
         "rewards": [],
         "zen_savings": 0,
         "zen_mode": False,
-        "last_weekly_reset": datetime.now().isoformat(),
-        "tracking_enabled": True  # New field added
+        "last_weekly_reset": datetime.now(),
+        "tracking_enabled": True
     })
     return True
 
-
-# -------------------------------
-# FinPet Level Check (with Level-Up Cashback Reward)
-# -------------------------------
 def check_pet_level_up():
     user_data = get_user_data()
     if not user_data:
@@ -268,7 +280,6 @@ def check_pet_level_up():
     rewards = user_data.get("rewards", [])
     updated = False
 
-    # Calculate how many levels can be upgraded
     while True:
         required_xp = current_level * 500
         if zen_savings >= required_xp:
@@ -277,10 +288,9 @@ def check_pet_level_up():
                 break
                 
             new_level = current_level + levels_gained
-            zen_savings %= required_xp  # Remainder after leveling
+            zen_savings %= required_xp
             updated = True
             
-            # Add rewards for each level gained
             for lvl in range(current_level + 1, new_level + 1):
                 cashback = lvl * 50
                 rewards.append(f"Level {lvl} Reward: ₹{cashback} cashback!")
@@ -300,8 +310,21 @@ def check_pet_level_up():
         })
         safe_rerun()
 
+def get_pet_image(lvl):
+    # Check if image file exists; if not, return None with status text.
+    if lvl < 5:
+        return None, "🥚 Egg (Hatch at Level 5)"
+    elif lvl < 15:
+        pet_image = "gifs/gif1.gif"
+        return pet_image if os.path.exists(pet_image) else None, "Ghastly"
+    elif lvl < 25:
+        pet_image = "gifs/gif2.gif"
+        return pet_image if os.path.exists(pet_image) else None, "Haunter"
+    else:
+        pet_image = "gifs/gif3.gif"
+        return pet_image if os.path.exists(pet_image) else None, "Gengar"
+
 def show_finpet():
-    # Force level check when viewing FinPet
     check_pet_level_up()
     
     st.title("🐾 Your FinPet")
@@ -314,20 +337,8 @@ def show_finpet():
     zen_savings = user_data.get("zen_savings", 0)
     rewards = user_data.get("rewards", [])
     
-    # Always calculate based on current level
     required_xp = level * 500
     current_progress = zen_savings / required_xp if required_xp > 0 else 0
-
-    # Pet evolution stages
-    def get_pet_image(lvl):
-        if lvl < 5:
-            return None, "🥚 Egg (Hatch at Level 5)"
-        elif lvl < 15:
-            return "gifs/gif1.gif", "Ghastly"
-        elif lvl < 25:
-            return "gifs/gif2.gif", "Haunter"
-        else:
-            return "gifs/gif3.gif", "Gengar"
 
     pet_image, pet_status = get_pet_image(level)
     
@@ -340,28 +351,36 @@ def show_finpet():
     
     with col2:
         st.markdown(f"### Level {level}")
-        st.progress(min(current_progress, 1.0))  # Ensure progress never exceeds 100%
-        st.write(f"**XP:** {zen_savings}/{required_xp}")
-        st.write(f"**Next Level:** ₹{max(0, required_xp - zen_savings)} needed")
+        st.progress(min(current_progress, 1.0))
+        st.write(f"*XP:* {zen_savings}/{required_xp}")
+        st.write(f"*Next Level:* ₹{max(0, required_xp - zen_savings)} needed")
 
     st.subheader("🎁 Recent Rewards")
     for reward in rewards[-3:]:
         st.markdown(f"- {reward}")
 
-# -------------------------------
-# Get & Update User Data (with Weekly Cashback Reward)
-# -------------------------------
 def get_user_data():
     user_data = data_col.find_one({"username": st.session_state.current_user})
     if user_data:
-        last_reset_str = user_data.get("last_weekly_reset", datetime.now().isoformat())
-        last_reset = datetime.fromisoformat(last_reset_str)
+        # Ensure last_weekly_reset is a naive datetime
+        if isinstance(user_data.get("last_weekly_reset"), str):
+            user_data["last_weekly_reset"] = to_naive(user_data["last_weekly_reset"])
+        elif isinstance(user_data.get("last_weekly_reset"), datetime):
+            user_data["last_weekly_reset"] = to_naive(user_data["last_weekly_reset"])
+        
+        for expense in user_data.get("expenses", []):
+            if isinstance(expense.get("date"), str):
+                expense["date"] = to_naive(expense["date"])
+            elif isinstance(expense.get("date"), datetime):
+                expense["date"] = to_naive(expense["date"])
+        
+        last_reset = user_data.get("last_weekly_reset", datetime.now())
         if datetime.now() - last_reset > timedelta(weeks=1):
             weekly_limit = user_data.get("budget_limits", {}).get("Wants", 0)
-            start_of_week = last_reset - timedelta(days=last_reset.weekday())
+            start_of_week_local = last_reset - timedelta(days=last_reset.weekday())
             expenses = user_data.get("expenses", [])
             weekly_spent = sum(e["total_amount"] for e in expenses 
-                               if e.get("type") == "Wants" and datetime.fromisoformat(e["date"]) >= start_of_week)
+                               if e.get("type") == "Wants" and to_naive(e.get("date")) >= start_of_week_local)
             unused_wants = max(0, weekly_limit - weekly_spent)
             new_savings = user_data.get("zen_savings", 0) + unused_wants
             rewards = user_data.get("rewards", [])
@@ -370,12 +389,11 @@ def get_user_data():
                 rewards.append(f"Weekly Cashback: ₹{cashback} awarded for unused 'Wants' budget!")
             update_user_data({
                 "zen_savings": new_savings,
-                "last_weekly_reset": datetime.now().isoformat(),
+                "last_weekly_reset": datetime.now(),
                 "rewards": rewards
             })
             check_pet_level_up()
         
-        # Add tracking_enabled field for existing users if missing
         if "tracking_enabled" not in user_data:
             data_col.update_one(
                 {"username": st.session_state.current_user},
@@ -387,58 +405,58 @@ def get_user_data():
     return None
 
 def update_user_data(update: dict):
+    def convert_np_ints(value):
+        if isinstance(value, dict):
+            return {key: convert_np_ints(val) for key, val in value.items()}
+        elif isinstance(value, list):
+            return [convert_np_ints(item) for item in value]
+        elif isinstance(value, (int, float, bool, str)):
+            return value
+        elif isinstance(value, np.int64):
+            return int(value)
+        return value
+
+    update = convert_np_ints(update)
     data_col.update_one({"username": st.session_state.current_user}, {"$set": update})
 
-# ---------- Fallback Function for Category ----------
 def fallback_category(description, predicted_category):
     desc = description.lower()
-    # Fallback for Food
     food_keywords = ["dinner", "lunch", "breakfast", "meal", "snack", "pizza", "burger", "sushi", "coffee", "tea"]
     if any(word in desc for word in food_keywords):
         return "Food"
-    # Fallback for Utilities
     utilities_keywords = ["electricity", "water", "gas", "internet", "cable", "phone bill", "rent", "tax", "maintenance"]
     if any(word in desc for word in utilities_keywords):
         return "Utilities"
-    # Fallback for Transport
     transport_keywords = ["bus", "taxi", "uber", "subway", "train", "ferry", "ride", "car", "bike"]
     if any(word in desc for word in transport_keywords):
         return "Transport"
-    # Fallback for Shopping
     shopping_keywords = ["shoes", "bag", "clothes", "jacket", "accessory", "electronics", "watch", "jeans", "decor"]
     if any(word in desc for word in shopping_keywords):
         return "Shopping"
-    # Fallback for Education
     education_keywords = ["course", "textbook", "tuition", "language", "workshop", "software", "seminar", "study", "certification", "journal"]
     if any(word in desc for word in education_keywords):
         return "Education"
-    # Fallback for Entertainment
     entertainment_keywords = ["movie", "concert", "comedy", "streaming", "theatre", "festival", "dance", "sports", "game", "amusement"]
     if any(word in desc for word in entertainment_keywords):
         return "Entertainment"
-    # Fallback for Miscellaneous
     misc_keywords = ["mobile", "gift", "repair", "gym", "haircut", "office", "grooming", "donate", "book", "medical", "medicine"]
     if any(word in desc for word in misc_keywords):
         return "Miscellaneous"
-    # Default to "Miscellaneous" if no keywords match.
     return "Miscellaneous"
 
 def show_chatbot():
     st.title("💬 AI Chatbot")
     st.markdown("Ask me anything about your finances, FinPet, expense history, available funds, goals, weekly wants, or even about your FinPet level!")
     
-    # Initialize session state for chat history if not present.
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     
-    # Display chat history.
     for chat in st.session_state.chat_history:
         if chat["sender"] == "user":
-            st.markdown(f"*You:* {chat['message']}")
+            st.markdown(f"You: {chat['message']}")
         else:
-            st.markdown(f"*Chatbot:* {chat['message']}")
+            st.markdown(f"Chatbot: {chat['message']}")
     
-    # Chat input form.
     with st.form("chat_form", clear_on_submit=True):
         user_input = st.text_input("Your message:")
         submit = st.form_submit_button("Send")
@@ -450,16 +468,14 @@ def show_chatbot():
 
 def generate_ai_response(message):
     msg = message.lower()
-    user_data = get_user_data()  # Fetch live user data for dynamic responses
+    user_data = get_user_data()
 
-    # -- Greetings and general inquiries --
     greeting_triggers = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]
     if any(trigger in msg for trigger in greeting_triggers):
         return "Hello! How can I help you with your finances today?"
     if "how are you" in msg:
         return "I'm just a chatbot, but I'm here to help you manage your money and FinPet!"
 
-    # -- FinPet level --
     finpet_triggers = ["finpet", "pet level", "what level", "level of my pet", "fin pet"]
     if any(trigger in msg for trigger in finpet_triggers):
         if user_data:
@@ -468,7 +484,6 @@ def generate_ai_response(message):
         else:
             return "I couldn't fetch your FinPet info. Please try again."
 
-    # -- Expense history: List all expenses --
     expense_history_triggers = ["expense history", "my expenses", "what did i spend", "recorded expenses", "expense records"]
     if any(trigger in msg for trigger in expense_history_triggers):
         if user_data:
@@ -478,16 +493,15 @@ def generate_ai_response(message):
             else:
                 response_str = "Here is your complete expense history:\n"
                 for expense in expenses:
-                    date = expense.get("date", "No date")
+                    dt = to_naive(expense.get("date"))
                     desc = expense.get("description", "No description")
                     amt = expense.get("total_amount", 0)
                     typ = expense.get("type", "Unknown")
-                    response_str += f"- {date}: '{desc}' costing ₹{amt} ({typ})\n"
+                    response_str += f"- {dt}: '{desc}' costing ₹{amt} ({typ})\n"
                 return response_str
         else:
             return "I couldn't fetch your expense history. Please try again."
 
-    # -- Last expense --
     last_expense_triggers = ["last expense", "most recent expense", "what is my expense", "tell me my expense"]
     if any(trigger in msg for trigger in last_expense_triggers):
         if user_data:
@@ -502,21 +516,19 @@ def generate_ai_response(message):
         else:
             return "I couldn't fetch your expenses. Please try again."
 
-    # -- Weekly Wants --
     weekly_wants_triggers = ["weekly wants", "weekly spending", "wants this week", "how much spent this week", "weekly limit"]
     if any(trigger in msg for trigger in weekly_wants_triggers):
         if user_data:
             budget_limits = user_data.get("budget_limits", {})
             weekly_limit = budget_limits.get("Wants", 0)
             expenses = user_data.get("expenses", [])
-            start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
+            start_week = datetime.now() - timedelta(days=datetime.now().weekday())
             weekly_wants_total = sum(e.get("total_amount", 0) for e in expenses 
-                                     if e.get("type") == "Wants" and datetime.fromisoformat(e["date"]) >= start_of_week)
+                                     if e.get("type") == "Wants" and to_naive(e.get("date")) >= start_week)
             return f"You have spent ₹{weekly_wants_total} on 'Wants' this week out of a limit of ₹{weekly_limit}."
         else:
             return "I couldn't fetch your weekly wants info. Please try again."
 
-    # -- Funds / Balance --
     funds_triggers = ["my funds", "available funds", "balance", "money i have", "account balance"]
     if any(trigger in msg for trigger in funds_triggers):
         if user_data:
@@ -525,7 +537,6 @@ def generate_ai_response(message):
         else:
             return "I couldn't fetch your funds info. Please try again."
 
-    # -- Goals: Show active goals --
     goals_triggers = ["goal", "goals", "what are my goals", "set goal", "financial goal"]
     if any(trigger in msg for trigger in goals_triggers):
         if user_data:
@@ -544,26 +555,19 @@ def generate_ai_response(message):
         else:
             return "I couldn't fetch your goals. Please try again."
 
-    # -- Setup Weekly Limit --
     setup_limit_triggers = ["setup weekly limit", "set weekly limit", "change weekly limit", "update weekly limit"]
     if any(trigger in msg for trigger in setup_limit_triggers):
         return "You can set or update your weekly 'Wants' limit on the Add Expense page by entering your desired limit."
 
-    # -- Expense management in general --
     expense_general_triggers = ["expense", "spend", "cost", "money", "record expense", "track expense"]
     if any(trigger in msg for trigger in expense_general_triggers):
         return "Managing your expenses is crucial. You can add a new expense on the Add Expense page. Let me know if you need help with that."
 
-    # -- Thank you / Acknowledgments --
     if "thank" in msg:
         return "You're welcome! I'm here to help."
 
-    # -- Fallback --
     return "I'm sorry, I didn't quite understand that. Could you please rephrase or provide more details?"
 
-# -------------------------------
-# Expense Management Functions
-# -------------------------------
 def show_add_expense():
     st.title("➕ Add New Expense")
     user_data = get_user_data()
@@ -571,7 +575,6 @@ def show_add_expense():
         st.error("User data not found.")
         return
     available_funds = user_data.get("available_funds", 0)
-    # Use the unified budget_limits key:
     budget_limits = user_data.get("budget_limits", {})
     wants_limit = budget_limits.get("Wants", 0)
     zen_mode = user_data.get("zen_mode", False)
@@ -589,9 +592,9 @@ def show_add_expense():
         st.success(f"Weekly 'Wants' limit increased to ₹{wants_limit}!")
         safe_rerun()
     
-    start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
+    start_week = datetime.now() - timedelta(days=datetime.now().weekday())
     weekly_wants_total = sum(e["total_amount"] for e in expenses 
-                             if e.get("type") == "Wants" and datetime.fromisoformat(e["date"]) >= start_of_week)
+                             if e.get("type") == "Wants" and to_naive(e.get("date")) >= start_week)
     st.write(f"🧾 'Wants' Spent This Week: ₹{weekly_wants_total}")
     
     if "pending_expense" not in st.session_state:
@@ -639,14 +642,12 @@ def show_add_expense():
         if submit:
             category_vector = vectorizer.transform([description])
             predicted_type = type_clf.predict(category_vector)[0]
-            # Use the Needs model if the type is "Needs"
             if predicted_type == "Wants":
                 predicted_category = cat_clf.predict(category_vector)[0]
             else:
                 vector_needs = vectorizer_needs.transform([description])
                 predicted_category = needs_cat_clf.predict(vector_needs)[0]
             
-            # Apply fallback rules for all categories
             predicted_category = fallback_category(description, predicted_category)
             
             if available_funds <= 0:
@@ -695,94 +696,95 @@ def show_expense_history():
     st.title("📜 Expense History")
     user_data = get_user_data()
     today = datetime.now()
-    start_of_week = today - timedelta(days=today.weekday())
+    start_week = today - timedelta(days=today.weekday())
     last_updated_str = user_data.get("wants_limit_last_updated")
-    last_updated = datetime.fromisoformat(last_updated_str) if last_updated_str else None
-    if not last_updated or last_updated < start_of_week:
+    last_updated = datetime.fromisoformat(last_updated_str) if last_updated_str and isinstance(last_updated_str, str) else None
+    if not last_updated or last_updated < start_week:
         user_data["weekly_wants_limit"] = 0
         user_data["wants_limit_last_updated"] = today.isoformat()
         update_user_data(user_data)
+
     if user_data and user_data.get("expenses"):
         # Create DataFrame from expenses
         df = pd.DataFrame(user_data["expenses"])
-        
-        # Convert to datetime and split into separate date and time columns
-        df['datetime'] = pd.to_datetime(df['date'])
-        df['Date'] = df['datetime'].dt.strftime('%Y-%m-%d')  # Date only
-        df['Time'] = df['datetime'].dt.strftime('%H:%M')     # Time only
-        
-        # Rename and order columns
+
+        # Convert date strings to datetime (all dates to naive using our helper)
+        df['datetime'] = df['date'].apply(lambda d: to_naive(d))
+        df['Date'] = df['datetime'].dt.strftime('%Y-%m-%d')
+        df['Time'] = df['datetime'].dt.strftime('%H:%M')
+
         df = df.rename(columns={
             'description': 'Description',
             'total_amount': 'Amount',
             'category': 'Category',
             'type': 'Type'
         })
-        
-        # Sort by datetime descending
+
         df = df.sort_values('datetime', ascending=False)
-        
-        # Process Description: Replace 'Added funds:...' with 'Added funds'
+
         df['Description'] = df['Description'].str.replace(r'^Added funds:.*', 'Added funds', regex=True)
-        
-        # Display main transaction table with styled amounts
-        st.subheader("All Transactions")
-        
-        # Prepare display DataFrame and style
+
+        st.subheader("Cash Transactions")
+
         display_df = df[['Date', 'Time', 'Description', 'Category', 'Type', 'Amount']].rename(columns={'Amount': 'Amount (₹)'})
-        
-        # Define styling function
+
         def highlight_amount(row):
             color = 'green' if row['Description'] == 'Added funds' else 'red'
             styles = [''] * len(display_df.columns)
             amount_idx = display_df.columns.get_loc('Amount (₹)')
             styles[amount_idx] = f'color: {color}'
             return styles
-        
-        # Apply styling and formatting
+
         styled_df = (
             display_df
             .style
             .apply(highlight_amount, axis=1)
             .format({'Amount (₹)': '₹{:.0f}'})
         )
-        
-        # Display styled DataFrame
+
         st.write(styled_df)
-        
-        # Create category-wise summary
-        st.subheader("Category-wise Spending Summary")
-        category_summary = df.groupby('Category')['Amount'].sum().reset_index()
-        category_summary['Amount'] = category_summary['Amount'].astype(int)
-        
-        # Display summary table with styling
-        st.dataframe(
-            category_summary,
-            column_config={
-                "Category": "Category",
-                "Amount": st.column_config.NumberColumn(
-                    "Total Spent (₹)",
-                    format="₹%d"
-                )
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-        
-        # Add visual separation
         st.markdown("---")
-        
     else:
         st.info("No expenses recorded yet.")
 
-# -------------------------------
-# Merged Funds & Goals Page
-# -------------------------------
+    st.subheader("💳 Paytm Transactions")
+    paytm_data = []
+    for i in range(10):
+        description = random.choice(["Bought coffee", "Shopping on Amazon", "Uber ride", "Booked movie tickets", "Grocery shopping"])
+        amount = random.randint(100, 5000)
+        predicted_category = model.predict([description])[0]
+        paytm_data.append({
+            "description": description,
+            "total_amount": amount,
+            "category": predicted_category,
+            "date": datetime.now().isoformat()
+        })
+
+    paytm_df = pd.DataFrame(paytm_data)
+    paytm_df['Date'] = pd.to_datetime(paytm_df['date'], utc=True).dt.tz_convert(None).dt.strftime('%Y-%m-%d')
+    paytm_df['Time'] = pd.to_datetime(paytm_df['date'], utc=True).dt.tz_convert(None).dt.strftime('%H:%M')
+    paytm_df['Description'] = paytm_df['description']
+    paytm_df['Category'] = paytm_df['category']
+    paytm_df = paytm_df.rename(columns={'total_amount': 'Amount'})
+
+    st.dataframe(paytm_df[['Date', 'Time', 'Description', 'Category', 'Amount']])
+    total_paytm_spent = paytm_df['Amount'].sum()
+    st.write(f"Total Spent via Paytm: ₹{total_paytm_spent}")
+
+    available_funds = user_data.get("available_funds", 0) - total_paytm_spent
+    user_data["available_funds"] = available_funds
+    weekly_wants_total = sum(e.get("total_amount", 0) for e in user_data["expenses"]
+                             if e.get("type") == "Wants" and to_naive(e.get("date")) >= start_week)
+    if weekly_wants_total + total_paytm_spent > user_data["budget_limits"].get("Wants", 0):
+        st.error("🚫 This expense exceeds your weekly 'Wants' limit!")
+    else:
+        st.success("Your weekly budget is updated!")
+    update_user_data(user_data)
+
 def show_funds_and_goals():
     st.title("💰 Funds & Goals")
     user_data = get_user_data()
     
-    # Funds Section
     st.header("💵 Manage Funds")
     available_funds = user_data.get("available_funds", 0)
     st.write(f"Current Available Funds: ₹{available_funds}")
@@ -808,7 +810,6 @@ def show_funds_and_goals():
                 st.success(f"₹{add_amount} added to your account!")
                 safe_rerun()
 
-    # Goals Section
     st.header("🎯 Financial Goals")
     goals = user_data.get("goals", [])
     zen_savings = user_data.get("zen_savings", 0)
@@ -842,7 +843,6 @@ def show_funds_and_goals():
                 st.metric(f"{goal_name}", f"₹{zen_savings}/₹{goal_amount}")
                 st.progress(min(progress, 1.0))
                 remaining_goals.append(goal)
-        
         if remaining_goals != goals:
             update_user_data({"goals": remaining_goals})
 
@@ -898,7 +898,6 @@ def show_home():
     
     user_data = get_user_data()
     
-    # ====== TRACKING TOGGLE ======
     tracking_enabled = st.checkbox(
         "Enable Financial Tracking", 
         value=user_data.get("tracking_enabled", True),
@@ -913,32 +912,28 @@ def show_home():
     if not tracking_enabled:
         st.warning("Financial tracking is currently disabled. Your expenses will not be recorded.")
         return
-    # ====== END TRACKING TOGGLE ======
     
     if not user_data or not user_data.get("expenses"):
         st.info("No expenses recorded yet.")
         return
     
-    # Convert expenses to DataFrame
     df = pd.DataFrame(user_data["expenses"])
-    df['date'] = pd.to_datetime(df['date'])
     
-    # Weekly Filter
-    start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
-    weekly_df = df[df['date'] >= start_of_week]
+    # Convert dates to naive datetimes using our helper function.
+    df['date'] = df['date'].apply(lambda d: to_naive(d))
+    
+    start_week = datetime.now() - timedelta(days=datetime.now().weekday())
+    weekly_df = df[df['date'] >= start_week]
     
     if weekly_df.empty:
         st.info("No expenses recorded this week.")
         return
     
-    # ====== VISUALIZATIONS ======
-    # Weekly Spending Trend
     st.subheader("📈 Weekly Spending Trend")
     daily_spending = weekly_df.groupby(weekly_df['date'].dt.date)['total_amount'].sum().reset_index()
     daily_spending.columns = ['Date', 'Total Amount']
     st.line_chart(daily_spending.set_index('Date'), use_container_width=True)
     
-    # Category Visualization
     st.subheader("📊 Spending by Category")
     chart_type = st.radio("Choose visualization:", ["Bar Chart", "Pie Chart"], horizontal=True)
     
@@ -946,7 +941,6 @@ def show_home():
     category_spending.columns = ['Category', 'Total Amount']
     
     if chart_type == "Bar Chart":
-        import altair as alt
         chart = alt.Chart(category_spending).mark_bar().encode(
             x=alt.X('Category:O', axis=alt.Axis(labelAngle=0, title='Category')),
             y='Total Amount:Q',
@@ -980,10 +974,7 @@ def show_home():
         ax.set_frame_on(False)
         st.pyplot(fig)
     
-    # ====== SAVINGS INSIGHTS ======
     st.subheader("💡 Personalized Savings Insights")
-    
-    # Top Category Analysis
     total_spent = weekly_df['total_amount'].sum()
     if total_spent > 0:
         category_percentages = (category_spending['Total Amount'] / total_spent) * 100
@@ -994,34 +985,33 @@ def show_home():
         with st.expander(f"🔍 Your Top Spending Category: {top_category} ({top_percent:.1f}%)"):
             if top_category == "Food":
                 st.markdown("""
-                🥡 **Dining Optimization Tips:**
+                🥡 *Dining Optimization Tips:*
                 - Meal prep 3x/week: Save ~₹1500 weekly
                 - Use grocery lists: Reduce impulse buys by 30%
                 - Bulk buying staples: Save 15% on essentials
                 """)
             elif top_category == "Entertainment":
                 st.markdown("""
-                🎬 **Entertainment Savings:**
+                🎬 *Entertainment Savings:*
                 - Host game nights: Save ₹500/outing
                 - Library resources: Free books/movies
                 - Early bird discounts: Save 20% on events
                 """)
             elif top_category == "Shopping":
                 st.markdown("""
-                🛍️ **Smart Shopping Strategies:**
+                🛍 *Smart Shopping Strategies:*
                 - 24-hour wait rule: Reduce impulse buys
                 - Price tracking: Use Honey/Camel extensions
                 - Seasonal sales: Plan purchases strategically
                 """)
             else:
                 st.markdown(f"""
-                💡 **{top_category} Optimization:**
+                💡 *{top_category} Optimization:*
                 - Review recurring subscriptions
                 - Compare service providers
                 - Bulk purchase discounts
                 """)
     
-    # Weekly Spending Analysis
     avg_daily = weekly_df.groupby(weekly_df['date'].dt.date)['total_amount'].sum().mean()
     with st.expander("📅 Weekly Spending Analysis"):
         col1, col2 = st.columns(2)
@@ -1031,14 +1021,14 @@ def show_home():
             st.metric("Daily Average", f"₹{avg_daily:.2f}")
             
         if avg_daily > 1000:
-            st.error("**High Spending Alert** 🚨")
+            st.error("*High Spending Alert* 🚨")
             st.markdown(f"""
             Reduce daily spending by:
             - 10% = ₹{avg_daily*0.1:.0f}/day → ₹{avg_daily*0.1*30:.0f}/month savings
             - 20% = ₹{avg_daily*0.2:.0f}/day → ₹{avg_daily*0.2*30:.0f}/month savings
             """)
         else:
-            st.success("**Spending Within Range** ✅")
+            st.success("*Spending Within Range* ✅")
             st.markdown("""
             Maintain good habits:
             - Track small purchases
@@ -1046,9 +1036,8 @@ def show_home():
             - Automated savings transfers
             """)
     
-    # Wants vs Needs Analysis
     wants_needs = weekly_df.groupby('type')['total_amount'].sum()
-    with st.expander("⚖️ Wants vs Needs Balance"):
+    with st.expander("⚖ Wants vs Needs Balance"):
         col1, col2 = st.columns(2)
         with col1:
             st.metric("Essential Needs", f"₹{wants_needs.get('Needs', 0)}")
@@ -1056,7 +1045,7 @@ def show_home():
             st.metric("Discretionary Wants", f"₹{wants_needs.get('Wants', 0)}")
         
         if wants_needs.get('Wants', 0) > wants_needs.get('Needs', 1)*0.5:
-            st.warning("**High Wants Spending**")
+            st.warning("*High Wants Spending*")
             st.markdown("""
             Balance suggestions:
             - 48-hour cooling period for wants
@@ -1064,7 +1053,7 @@ def show_home():
             - Prioritize experience-based purchases
             """)
         else:
-            st.success("**Healthy Balance**")
+            st.success("*Healthy Balance*")
             st.markdown("""
             Good financial discipline!
             - Consider automating savings
@@ -1072,26 +1061,24 @@ def show_home():
             - Plan for long-term goals
             """)
     
-    # General Savings Tips
     with st.expander("💰 Pro Savings Strategies"):
         st.markdown(f"""
-        **Smart Money Moves:**
-        🐾 **FinPet Benefits:** 
+        *Smart Money Moves:*
+        🐾 *FinPet Benefits:* 
         - Level {user_data.get('pet_level', 1)} rewards: Better cashback offers
         - Current XP Savings: ₹{user_data.get('zen_savings', 0)}
         
-        🔄 **Budget Hacks:**
+        🔄 *Budget Hacks:*
         - Review weekly wants limit
         - Automate bill payments
         - Use cash envelopes for discretionary spending
         
-        📱 **App Features:**
+        📱 *App Features:*
         - Zen Mode savings tracker
         - AI Chatbot for instant advice
         - Expense categorization insights
         """)
     
-    # ====== QUICK STATS ======
     st.subheader("⚡ Quick Stats")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1112,7 +1099,7 @@ def main():
     pages = [
         "Home", 
         "Add Expense", 
-        "Funds & Goals",  # Merged page
+        "Funds & Goals",  
         "Expense History", 
         "FinPet", 
         "Weekly Wants",
@@ -1138,9 +1125,9 @@ def main():
         expenses = user_data.get("expenses", [])
         budget_limits = user_data.get("budget_limits", {})
         weekly_limit = budget_limits.get("Wants", 0)
-        start_of_week = datetime.now() - timedelta(days=datetime.now().weekday())
+        start_week = datetime.now() - timedelta(days=datetime.now().weekday())
         weekly_wants_total = sum(e["total_amount"] for e in expenses 
-                                 if e.get("type") == "Wants" and datetime.fromisoformat(e["date"]) >= start_of_week)
+                                 if e.get("type") == "Wants" and to_naive(e.get("date")) >= start_week)
         st.write(f"### 🧾 You've spent ₹{weekly_wants_total} on 'Wants' this week.")
         st.write(f"🎯 Weekly Limit: ₹{weekly_limit}")
         if weekly_limit > 0:
