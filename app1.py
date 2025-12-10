@@ -216,8 +216,8 @@ else:
         needs_cat_clf = pickle.load(f)
 
 # ---------- MongoDB Remote Connection Setup ----------
-username_db = quote_plus("soveetprusty")
-password_db = quote_plus("@Noobdamaster69")
+username_db = quote_plus("")
+password_db = quote_plus("")
 conn_str = (
     f"mongodb+srv://{username_db}:{password_db}"
     "@cluster0.bjzstq0.mongodb.net/?retryWrites=true&w=majority"
