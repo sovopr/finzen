@@ -57,9 +57,6 @@ finzen/
 ├── vectorizer_needs.pkl        # (optional) needs-category vectorizer
 ├── needs_cat_classifier.pkl    # (optional) needs category classifier
 
-> If the `.pkl` files are not present, the application automatically trains and saves the models on first run.
-
----
 
 ## Tech Stack
 
@@ -75,7 +72,7 @@ finzen/
 ## Installation & Setup
 
 ### 1. Clone the repository
-```bash
+
 git clone https://github.com/sovopr/finzen.git
 cd finzen
 
