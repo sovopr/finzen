@@ -1,139 +1,70 @@
-Got it.
-Below is ONE SINGLE FILE, nothing else.
-Copy–paste this entire thing as README.md.
+Based on the file structure image you uploaded, I can see exactly what is going on. It looks like an AI-powered financial tracking app built with Streamlit that uses Machine Learning to classify transactions (Needs vs. Wants) and includes a gamified "FinPet" feature.
+Here is a professional, clean README.md file ready for you to copy and paste.
+How to use this:
+ * Create a file named README.md in your finzen folder.
+ * Paste the code block below into it.
+# FinZen 🧘‍♂️💸
 
-⸻
+**FinZen** is an AI-powered personal finance assistant built to help you achieve financial mindfulness. It combines Machine Learning for automated transaction classification with **FinPet**, a gamified virtual companion that reacts to your spending habits.
 
+## 🚀 Features
 
-# FinZen — Helping Gen-Z Track Expenses
+* **AI-Powered Classification:** Uses pre-trained Machine Learning models (`type_classifier.pkl`) to automatically distinguish between **Needs** (Essentials) and **Wants** (Discretionary).
+* **Smart Categorization:** Automatically assigns specific categories to your transactions using Natural Language Processing (NLP).
+* **FinPet Companion:** A virtual pet that grows and reacts based on your financial discipline. (Assets located in `gifs/`).
+* **Interactive Dashboard:** A clean, real-time interface built with **Streamlit**.
+* **Privacy Focused:** Runs locally on your machine.
 
-FinZen is a Streamlit-based personal finance tracking application designed for Gen-Z users. It combines expense tracking, basic machine-learning–based categorization, gamification via a virtual pet, and a lightweight chatbot, all backed by MongoDB for persistence.
+## 🛠️ Tech Stack
 
----
+* **Frontend:** [Streamlit](https://streamlit.io/)
+* **Language:** Python 3.x
+* **Machine Learning:** Scikit-learn (for vectorization and classification models)
+* **Data Handling:** Pandas, NumPy
 
-## Features
+## 📂 Project Structure
 
-### Expense Tracking
-- Add and store daily expenses
-- Automatic classification into **Needs** and **Wants**
-- Category prediction (Food, Utilities, Transport, Shopping, etc.)
-
-### Machine Learning
-- Text-based expense classification using `CountVectorizer`
-- RandomForest and Naive Bayes classifiers
-- Automatically trains models if pickle files are missing
-- Keyword-based fallback categorization for reliability
-
-### FinPet (Gamification)
-- Virtual pet that grows as the user saves
-- XP / level system based on savings (`zen_savings`)
-- GIF-based visual feedback
-
-### Chatbot
-- Rule-based financial assistant
-- Answers queries related to:
-  - Expense history
-  - Weekly wants
-  - Remaining funds
-  - FinPet status
-  - Basic finance questions
-
-### Database
-- MongoDB backend
-- Collections for users, transactions, and user data
-- Passwords hashed using SHA-256
-
----
-
-## Project Structure
-
+```text
 finzen/
-├── app1.py                     # Main Streamlit application
-├── requirements.txt            # Python dependencies
-├── gifs/                       # FinPet GIF assets
-├── vectorizer.pkl              # (optional) text vectorizer
-├── type_classifier.pkl         # (optional) needs/wants classifier
-├── cat_classifier.pkl          # (optional) category classifier
-├── vectorizer_needs.pkl        # (optional) needs-category vectorizer
-├── needs_cat_classifier.pkl    # (optional) needs category classifier
+├── app1.py                   # Main Streamlit application entry point
+├── requirements.txt          # Python dependencies list
+├── gifs/                     # Assets for the FinPet gamification feature
+├── vectorizer.pkl            # NLP Vectorizer for text processing
+├── type_classifier.pkl       # ML Model: Classifies transactions as 'Needs' or 'Wants'
+├── cat_classifier.pkl        # ML Model: Classifies transactions into specific categories
+├── vectorizer_needs.pkl      # (Optional) Specialized vectorizer for needs
+└── needs_cat_classifier.pkl  # (Optional) Specialized classifier for needs categories
 
-
-## Tech Stack
-
-- **Frontend:** Streamlit  
-- **Backend:** Python  
-- **Database:** MongoDB  
-- **Machine Learning:** scikit-learn  
-- **Data Handling:** pandas, numpy  
-- **Utilities:** Pillow, certifi  
-
----
-
-## Installation & Setup
-
-### 1. Clone the repository
-
-git clone https://github.com/sovopr/finzen.git
+⚙️ Installation
+ * Clone the repository:
+   git clone [https://github.com/sovopr/finzen.git](https://github.com/sovopr/finzen.git)
 cd finzen
 
-2. (Recommended) Create a virtual environment
+ * Create a virtual environment (optional but recommended):
+   python -m venv venv
+# Windows
+venv\Scripts\activate
+# Mac/Linux
+source venv/bin/activate
 
-python -m venv venv
-source venv/bin/activate   # macOS / Linux
-venv\Scripts\activate      # Windows
+ * Install dependencies:
+   pip install -r requirements.txt
 
-3. Install dependencies
-
-pip install -r requirements.txt
-
-For a minimal setup:
-
-pip install streamlit scikit-learn pandas pymongo numpy pillow certifi
-
-
-⸻
-
-MongoDB Configuration
-
-The MongoDB connection string is defined inside app1.py.
-
-You must provide:
-	•	MongoDB username
-	•	MongoDB password
-	•	MongoDB cluster URL
-
-Example (do not commit credentials):
-
-username_db = quote_plus("YOUR_USERNAME")
-password_db = quote_plus("YOUR_PASSWORD")
-
-
-⸻
-
-Running the Application
-
+🏃‍♂️ Usage
+To start the application, run the Streamlit command in your terminal:
 streamlit run app1.py
 
-On first run:
-	•	ML models are trained if pickle files are missing
-	•	Trained models are saved locally for future use
-
-⸻
-
-Known Limitations
-	•	Password hashing uses SHA-256 without salting
-	•	ML models are trained on a small synthetic dataset
-	•	Entire application logic resides in a single file (app1.py)
-	•	Secrets are not managed via environment variables
-	•	No automated tests or CI pipeline
-
-⸻
-
-Future Improvements
-	•	Modularize the codebase
-	•	Move model training to a separate script
-	•	Use .env files for configuration
-	•	Upgrade password hashing (bcrypt / argon2)
-	•	Add Docker support
-	•	Improve ML accuracy with real user data
-	•	Add unit tests and CI/CD
+The application will open in your default web browser (usually at http://localhost:8501).
+🧠 How the AI Works
+FinZen utilizes serialized Python objects (.pkl files) to process your data:
+ * Input: You enter a transaction description (e.g., "Grocery shopping at Walmart").
+ * Vectorization: vectorizer.pkl converts this text into a format the machine understands.
+ * Prediction: type_classifier.pkl predicts if it is a Need or a Want.
+ * Feedback: The FinPet reacts (happy for savings/needs, concerned for excessive wants) using the assets in the gifs/ folder.
+🤝 Contributing
+Contributions are welcome! If you have suggestions for better classification models or new FinPet features:
+ * Fork the repository.
+ * Create a feature branch (git checkout -b feature-name).
+ * Commit your changes.
+ * Push to the branch and open a Pull Request.
+ 
