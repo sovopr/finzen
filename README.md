@@ -34,6 +34,7 @@ finzen/
 ├── cat_classifier.pkl        # ML Model: Classifies transactions into specific categories
 ├── vectorizer_needs.pkl      # (Optional) Specialized vectorizer for needs
 └── needs_cat_classifier.pkl  # (Optional) Specialized classifier for needs categories
+```
 
 ⚙️ Installation
  * Clone the repository:
